@@ -7,6 +7,3 @@ int main() {
 	init_shell();
 	return 0;
 }
-
-
-

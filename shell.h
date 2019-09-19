@@ -19,7 +19,7 @@ using namespace std;
 
 
 
-void init_shell ();
+void init_shell();
 int verifyDirectory(char * dir);
 void completionHook (char const* prefix, linenoiseCompletions* lc);
 void attCwdFiles();
