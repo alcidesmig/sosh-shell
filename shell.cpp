@@ -13,8 +13,10 @@ static const char *commands[] =
 };
 
 
+
 char cwd[PATH_MAX];
 vector<string> cwdFiles;
+vector<Job> jobs;
 
 int verifyDirectory(char *dir)
 {
@@ -76,13 +78,50 @@ void handle(char *result)
 {
     char *cmd = strtok(strdup(result), " ");
 
+    int background = result[strlen(result) - 1] == '&';
+
     if (!strcmp(cmd, "jobs"))
     {
-
+        for (std::size_t i = 0; i < jobs.size(); ++i)
+        {
+            if(kill(jobs[i].pid, 0) < 0){
+                jobs[i].active = 0;
+            }
+            if(jobs[i].active) cout << "Job " << jobs[i].id_job << " [" << jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
+        }
     }
+
     else if (!strcmp(cmd, "fg"))
     {
+        char *fg = strtok(NULL, "\0");
+        if(fg[0] == '%')
+        {
+            fg = &(fg[1]);
+            int id_job;
+            if(sscanf(fg, "%d", &id_job) > 0)
+            {
 
+                int i = 0;
+
+                while(jobs[i].id_job != id_job && i++ < jobs.size());
+
+                if(i != jobs.size()) {
+                    int status;
+                    waitpid(jobs[i].pid, &status, 0);
+                } else {
+                    cerr << "Job não encontrado." << endl;
+                }
+                
+            }
+            else
+            {
+                cerr << "Utilize fg %id_job." << endl;
+            }
+        }
+        else
+        {
+            cerr << "Utilize fg %id_job." << endl;
+        }
     }
     else if (!strcmp(cmd, "bg"))
     {
@@ -123,25 +162,61 @@ void handle(char *result)
         {
             waitpid(pid, &status, WUNTRACED);
         }
+        else if (pid < 0)
+        {
+            cerr << "Erro ao executar o programa" << endl;
+        }
         else
         {
-            char *argv[] = {NULL};
-            char *envp[] = {NULL};
-
-            execve(cmd, argv, envp);
+            char *argv = strtok(NULL, "\0");
+            execv(cmd, &argv);
         }
     }
     else
     {
-        cerr << cmd << ": comando não encontrado" << endl;
+        pid_t pid = fork();
+        int status;
+
+        if (pid && !background)
+        {
+            waitpid(pid, &status, WUNTRACED); /* Wait for process in foreground */
+        }
+        else if (pid && background)
+        {
+            Job job; /* Process in background */
+            job.pid = pid;
+            job.cmd = result;
+            job.active = 1;
+            if (jobs.size() == 0) job.id_job = 1;
+            else job.id_job = jobs[jobs.size() - 1].id_job + 1;
+            jobs.push_back(job);
+            return;
+        }
+        else if (pid < 0)
+        {
+            cerr << "Erro ao executar o programa" << endl;
+        }
+        else
+        {
+            char *argv = strtok(NULL, "\0");
+            
+            if(argv[0] == '&') argv = &argv[1];
+
+            char env_cmd[6] = "/bin/";
+
+            strcat(env_cmd, cmd);
+
+            int exec_status = execv(env_cmd, &argv);
+
+            if(exec_status)
+            {
+                cerr << cmd << ": comando não encontrado" << endl;
+            }
+
+        }
     }
 }
 
-
-pid_t shell_pgid;
-struct termios shell_tmodes;
-int shell_terminal;
-int shell_is_interactive;
 
 /* Make sure the shell is running interactively as the foreground job
    before proceeding. */
@@ -150,78 +225,48 @@ void
 init_shell ()
 {
 
-    /* See if we are running interactively.  */
-    shell_terminal = STDIN_FILENO;
-    shell_is_interactive = isatty (shell_terminal);
+    cout << "Shell iniciado" << endl;
 
-    if (shell_is_interactive)
+    /* Linenoise functions */
+
+    char prompt[2 * PATH_MAX];
+
+    attCwd();
+    attCwdFiles();
+
+    linenoiseInstallWindowChangeHandler();
+    linenoiseHistoryLoad(HISTORY);
+    linenoiseSetCompletionCallback(completionHook);
+
+    while (1)
     {
-        /* Loop until we are in the foreground.  */
-        while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
-            kill (- shell_pgid, SIGTTIN);
+        memset(prompt, '\0', 2 * PATH_MAX);
+        strcat(prompt, "\x1b[1;32mshell\x1b[0m:\x1b[1;34m");
+        strcat(prompt, cwd);
+        strcat(prompt, "\x1b[0m$ ");
 
-        /* Ignore interactive and job-control signals.  */
-        signal (SIGINT, SIG_IGN);
-        signal (SIGQUIT, SIG_IGN);
-        signal (SIGTSTP, SIG_IGN);
-        signal (SIGTTIN, SIG_IGN);
-        signal (SIGTTOU, SIG_IGN);
-        signal (SIGCHLD, SIG_IGN);
+        char *result = linenoise(prompt);
 
-        /* Put ourselves in our own process group.  */
-        shell_pgid = getpid ();
-        if (setpgid (shell_pgid, shell_pgid) < 0)
+        if (result == NULL)
         {
-            perror ("Couldn't put the shell in its own process group");
-            exit (1);
+            break;
+        }
+        else
+        {
+            handle(result);
         }
 
-        /* Grab control of the terminal.  */
-        tcsetpgrp (shell_terminal, shell_pgid);
-
-        /* Save default terminal attributes for shell.  */
-        tcgetattr (shell_terminal, &shell_tmodes);
-
-        /* Linenoise functions */
-
-        char prompt[2 * PATH_MAX];
-
-        attCwd();
-        attCwdFiles();
-
-        linenoiseInstallWindowChangeHandler();
-        linenoiseHistoryLoad(HISTORY);
-        linenoiseSetCompletionCallback(completionHook);
-
-        while (1)
+        if (*result == '\0')
         {
-            memset(prompt, '\0', 2 * PATH_MAX);
-            strcat(prompt, "\x1b[1;32mshell\x1b[0m:\x1b[1;34m");
-            strcat(prompt, cwd);
-            strcat(prompt, "\x1b[0m$ ");
-
-            char *result = linenoise(prompt);
-
-            if (result == NULL)
-            {
-                break;
-            }
-            else
-            {
-                handle(result);
-            }
-
-            if (*result == '\0')
-            {
-                free(result);
-                break;
-            }
-
-            linenoiseHistoryAdd(result);
             free(result);
+            break;
         }
 
-        linenoiseHistorySave(HISTORY);
-        linenoiseHistoryFree();
+        linenoiseHistoryAdd(result);
+        free(result);
     }
+
+    linenoiseHistorySave(HISTORY);
+    linenoiseHistoryFree();
+
 }

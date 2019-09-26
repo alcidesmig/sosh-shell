@@ -2,6 +2,7 @@
 #define SHELL_H
 
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
 #include <signal.h>
@@ -18,12 +19,18 @@
 using namespace std;
 
 
-
 void init_shell();
 int verifyDirectory(char * dir);
 void completionHook (char const* prefix, linenoiseCompletions* lc);
 void attCwdFiles();
 void attCwd();
 void handle(char *result);
+
+typedef struct {
+	pid_t pid;
+	string cmd;
+	int id_job;
+	int active;
+} Job;
 
 #endif /* SHELL_H */
