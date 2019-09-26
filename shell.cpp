@@ -84,7 +84,8 @@ void handle(char *result)
     {
         for (std::size_t i = 0; i < jobs.size(); ++i)
         {
-            if(kill(jobs[i].pid, 0) < 0){
+            if(kill(jobs[i].pid, 0) < 0)
+            {
                 jobs[i].active = 0;
             }
             if(jobs[i].active) cout << "Job " << jobs[i].id_job << " [" << jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
@@ -100,18 +101,19 @@ void handle(char *result)
             int id_job;
             if(sscanf(fg, "%d", &id_job) > 0)
             {
-
                 int i = 0;
 
                 while(jobs[i].id_job != id_job && i++ < jobs.size());
 
-                if(i != jobs.size()) {
+                if(i != jobs.size())
+                {
                     int status;
                     waitpid(jobs[i].pid, &status, 0);
-                } else {
+                }
+                else
+                {
                     cerr << "Job não encontrado." << endl;
                 }
-                
             }
             else
             {
@@ -176,12 +178,11 @@ void handle(char *result)
     {
         pid_t pid = fork();
         int status;
-
-        if (pid && !background)
+        if (pid != 0 && !background)
         {
-            waitpid(pid, &status, WUNTRACED); /* Wait for process in foreground */
+            waitpid(pid, &status, 0); /* Wait for process in foreground */
         }
-        else if (pid && background)
+        else if (pid != 0 && background)
         {
             Job job; /* Process in background */
             job.pid = pid;
@@ -199,8 +200,6 @@ void handle(char *result)
         else
         {
             char *argv = strtok(NULL, "\0");
-            
-            if(argv[0] == '&') argv = &argv[1];
 
             char env_cmd[6] = "/bin/";
 
