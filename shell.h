@@ -14,6 +14,7 @@
 #include <vector>
 #include <iostream>
 #include <sys/stat.h>
+#include <errno.h>
 #include "linenoise.h"
 using namespace std;
 

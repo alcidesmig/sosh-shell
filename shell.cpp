@@ -13,7 +13,7 @@ static const char *commands[] =
 };
 
 
-
+int stop_shell;
 char cwd[PATH_MAX];
 vector<string> cwdFiles;
 vector<Job> jobs;
@@ -80,11 +80,17 @@ void handle(char *result)
 
     int background = result[strlen(result) - 1] == '&';
 
+    if(background) {
+        result[strlen(result) - 1] = '\0';
+    }
+
     if (!strcmp(cmd, "jobs"))
     {
+        if(jobs.size() == 0) cout << "Não há tarefas no histórico" << endl;
         for (std::size_t i = 0; i < jobs.size(); ++i)
         {
-            if(kill(jobs[i].pid, 0) < 0)
+            kill(jobs[i].pid, 0);
+            if(errno = ESRCH)
             {
                 jobs[i].active = 0;
             }
@@ -103,7 +109,7 @@ void handle(char *result)
             {
                 int i = 0;
 
-                while(jobs[i].id_job != id_job && i++ < jobs.size());
+                while(jobs[i].id_job != id_job || i++ < jobs.size());
 
                 if(i != jobs.size())
                 {
@@ -180,7 +186,9 @@ void handle(char *result)
         int status;
         if (pid != 0 && !background)
         {
+            printf("Esperando\n");
             waitpid(pid, &status, 0); /* Wait for process in foreground */
+            printf("Finalizado\n");
         }
         else if (pid != 0 && background)
         {
@@ -211,7 +219,7 @@ void handle(char *result)
             {
                 cerr << cmd << ": comando não encontrado" << endl;
             }
-
+            stop_shell = 1;
         }
     }
 }
@@ -223,7 +231,7 @@ void handle(char *result)
 void
 init_shell ()
 {
-
+    stop_shell = 0;
     cout << "Shell iniciado" << endl;
 
     /* Linenoise functions */
@@ -237,7 +245,7 @@ init_shell ()
     linenoiseHistoryLoad(HISTORY);
     linenoiseSetCompletionCallback(completionHook);
 
-    while (1)
+    while (!stop_shell)
     {
         memset(prompt, '\0', 2 * PATH_MAX);
         strcat(prompt, "\x1b[1;32mshell\x1b[0m:\x1b[1;34m");
@@ -267,5 +275,5 @@ init_shell ()
 
     linenoiseHistorySave(HISTORY);
     linenoiseHistoryFree();
-
+    return;
 }
