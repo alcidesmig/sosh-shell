@@ -10,7 +10,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <limits.h>
-#include <sys/wait.h> 
+#include <sys/wait.h>
 #include <vector>
 #include <iostream>
 #include <sys/stat.h>
@@ -19,18 +19,27 @@
 using namespace std;
 
 
-void init_shell();
-int verifyDirectory(char * dir);
-void completionHook (char const* prefix, linenoiseCompletions* lc);
+int verifyDirectory(char *dir);
+void completionHook (char const *prefix, linenoiseCompletions *lc);
 void attCwdFiles();
 void attCwd();
+void executeProgram(char *cmd, char *result, char *argv, int background);
+void executeFile(char *cmd, char *argv);
+void foreground(char *fg);
+void changeDirectory(char *path);
+void listFiles();
+void printCurrentDirectory();
+void listJobs();
 void handle(char *result);
+void sigHandler(int sig);
+void init_shell ();
 
-typedef struct {
-	pid_t pid;
-	string cmd;
-	int id_job;
-	int active;
+typedef struct
+{
+    pid_t pid;
+    string cmd;
+    int id_job;
+    int active;
 } Job;
 
 #endif /* SHELL_H */

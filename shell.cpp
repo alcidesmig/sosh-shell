@@ -74,6 +74,136 @@ void attCwd()
     }
 }
 
+void executeProgram(char *cmd, char *result, char *argv, int background)
+{
+    pid_t pid = fork();
+    int status;
+    if (pid != 0 && !background)
+    {
+        printf("Esperando\n");
+        waitpid(pid, &status, 0); /* Wait for process in foreground */
+        printf("Finalizado\n");
+    }
+    else if (pid != 0 && background)
+    {
+        Job job; /* Process in background */
+        job.pid = pid;
+        job.cmd = result;
+        job.active = 1;
+        if (jobs.size() == 0) job.id_job = 1;
+        else job.id_job = jobs[jobs.size() - 1].id_job + 1;
+        jobs.push_back(job);
+        return;
+    }
+    else if (pid < 0)
+    {
+        cerr << "Erro ao executar o programa" << endl;
+    }
+    else
+    {
+        char env_cmd[6] = "/bin/";
+
+        strcat(env_cmd, cmd);
+
+        int exec_status = execv(env_cmd, &argv);
+
+        if(exec_status)
+        {
+            cerr << cmd << ": comando não encontrado" << endl;
+        }
+    }
+}
+
+void executeFile(char *cmd, char *argv)
+{
+    int pid = fork();
+    int status;
+
+    if (pid)
+    {
+        waitpid(pid, &status, WUNTRACED);
+    }
+    else if (pid < 0)
+    {
+        cerr << "Erro ao executar o programa" << endl;
+    }
+    else
+    {
+        execv(cmd, &argv);
+    }
+}
+
+void foreground(char *fg)
+{
+    if(fg[0] == '%')
+    {
+        fg = &(fg[1]);
+        int id_job;
+        if(sscanf(fg, "%d", &id_job) > 0)
+        {
+            int i = 0;
+
+            while(jobs[i].id_job != id_job || i++ < jobs.size());
+
+            if(i != jobs.size())
+            {
+                int status;
+                waitpid(jobs[i].pid, &status, 0);
+            }
+            else
+            {
+                cerr << "Job não encontrado." << endl;
+            }
+        }
+        else
+        {
+            cerr << "Utilize fg %id_job." << endl;
+        }
+    }
+    else
+    {
+        cerr << "Utilize fg %id_job." << endl;
+    }
+}
+
+void changeDirectory(char *path)
+{
+    if (!chdir(path))
+    {
+        cwdFiles.clear();
+        attCwdFiles();
+        attCwd();
+    }
+    else cout << "Diretório " << path << " não existe \n";
+}
+
+void listFiles()
+{
+    for (std::size_t i = 0; i < cwdFiles.size(); ++i)
+    {
+        cout << cwdFiles[i] << endl;
+    }
+}
+
+void printCurrentDirectory()
+{
+    cout << cwd << endl;
+}
+
+void listJobs()
+{
+    if(jobs.size() == 0) cout << "Não há tarefas no histórico" << endl;
+    for (std::size_t i = 0; i < jobs.size(); ++i)
+    {
+        kill(jobs[i].pid, 0);
+        if(errno = ESRCH)
+        {
+            jobs[i].active = 0;
+        }
+        if(jobs[i].active) cout << "Job " << jobs[i].id_job << " [" << jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
+    }
+}
+
 void handle(char *result)
 {
     char *cmd = strtok(strdup(result), " ");
@@ -87,50 +217,13 @@ void handle(char *result)
 
     if (!strcmp(cmd, "jobs"))
     {
-        if(jobs.size() == 0) cout << "Não há tarefas no histórico" << endl;
-        for (std::size_t i = 0; i < jobs.size(); ++i)
-        {
-            kill(jobs[i].pid, 0);
-            if(errno = ESRCH)
-            {
-                jobs[i].active = 0;
-            }
-            if(jobs[i].active) cout << "Job " << jobs[i].id_job << " [" << jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
-        }
+        listJobs();
     }
 
     else if (!strcmp(cmd, "fg"))
     {
         char *fg = strtok(NULL, "\0");
-        if(fg[0] == '%')
-        {
-            fg = &(fg[1]);
-            int id_job;
-            if(sscanf(fg, "%d", &id_job) > 0)
-            {
-                int i = 0;
-
-                while(jobs[i].id_job != id_job || i++ < jobs.size());
-
-                if(i != jobs.size())
-                {
-                    int status;
-                    waitpid(jobs[i].pid, &status, 0);
-                }
-                else
-                {
-                    cerr << "Job não encontrado." << endl;
-                }
-            }
-            else
-            {
-                cerr << "Utilize fg %id_job." << endl;
-            }
-        }
-        else
-        {
-            cerr << "Utilize fg %id_job." << endl;
-        }
+        foreground(fg);
     }
     else if (!strcmp(cmd, "bg"))
     {
@@ -139,24 +232,15 @@ void handle(char *result)
     else if (!strcmp(cmd, "cd"))
     {
         char *path = strtok(NULL, "\0");
-        if (!chdir(path))
-        {
-            cwdFiles.clear();
-            attCwdFiles();
-            attCwd();
-        }
-        else cout << "Diretório " << path << " não existe \n";
+        changeDirectory(path);
     }
     else if (!strcmp(cmd, "ls"))
     {
-        for (std::size_t i = 0; i < cwdFiles.size(); ++i)
-        {
-            cout << cwdFiles[i] << endl;
-        }
+        listFiles();
     }
     else if (!strcmp(cmd, "pwd"))
     {
-        cout << cwd << endl;
+        printCurrentDirectory();
     }
     else if (!strcmp(cmd, "exit"))
     {
@@ -164,64 +248,14 @@ void handle(char *result)
     }
     else if (cmd[0] == '.' && cmd[1] == '/')
     {
-        int pid = fork();
-        int status;
-
-        if (pid)
-        {
-            waitpid(pid, &status, WUNTRACED);
-        }
-        else if (pid < 0)
-        {
-            cerr << "Erro ao executar o programa" << endl;
-        }
-        else
-        {
-            char *argv = strtok(NULL, "\0");
-            execv(cmd, &argv);
-        }
+        char *argv = strtok(NULL, "\0");
+        executeFile(cmd, argv);
     }
     else
     {
-        pid_t pid = fork();
-        int status;
-        if (pid != 0 && !background)
-        {
-            printf("Esperando\n");
-            waitpid(pid, &status, 0); /* Wait for process in foreground */
-            printf("Finalizado\n");
-        }
-        else if (pid != 0 && background)
-        {
-            Job job; /* Process in background */
-            job.pid = pid;
-            job.cmd = result;
-            job.active = 1;
-            if (jobs.size() == 0) job.id_job = 1;
-            else job.id_job = jobs[jobs.size() - 1].id_job + 1;
-            jobs.push_back(job);
-            return;
-        }
-        else if (pid < 0)
-        {
-            cerr << "Erro ao executar o programa" << endl;
-        }
-        else
-        {
-            char *argv = strtok(NULL, "\0");
+        char *argv = strtok(NULL, "\0");
+        executeProgram(cmd, result, argv, background);
 
-            char env_cmd[6] = "/bin/";
-
-            strcat(env_cmd, cmd);
-
-            int exec_status = execv(env_cmd, &argv);
-
-            if(exec_status)
-            {
-                cerr << cmd << ": comando não encontrado" << endl;
-            }
-            stop_shell = 1;
-        }
     }
 }
 
