@@ -15,7 +15,7 @@
 #include <iostream>
 #include <sys/stat.h>
 #include <errno.h>
-#include "linenoise.h"
+#include "linenoise/linenoise.h"
 using namespace std;
 
 
