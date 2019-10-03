@@ -132,9 +132,8 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
             close(fd1);
         }
 
-        char *args[] = { cmd, argv, NULL }; printf("Erro2\n");
+        char *args[] = { cmd, argv, NULL };
         int exec_status = execv(cmd, args);
- printf("Erro2\n");
         if(exec_status)
         {
             cerr << cmd << ": comando não encontrado" << endl;
@@ -144,41 +143,28 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
 
 void executeFile(char *cmd, char *argv, char *result)
 {
-    int pid = fork();
-    int status;
+    int background = result[strlen(result) - 1] == '&';
+    int out = 0, in = 0;
+    char *inFile, * outFile;
+    if(isInString(result, '<'))
+    {
+        in = 1;
+        inFile = strtok(strdup(result), ">");
+        inFile = strtok(NULL, "\0");
+        while(inFile[0] == ' ') inFile = &inFile[1];
+        argv = strtok(result, ">");
+    }
+    if(isInString(result, '>'))
+    {
+        out = 1;
+        outFile = strtok(strdup(result), ">");
+        outFile = strtok(NULL, "\0");
+        while(outFile[0] == ' ') outFile = &outFile[1];
+        argv = strtok(result, ">");
+    }
 
-    if (pid)
-    {
-        waitpid(pid, &status, WUNTRACED);
-    }
-    else if (pid < 0)
-    {
-        cerr << "Erro ao executar o programa" << endl;
-    }
-    else
-    {
-        int background = result[strlen(result) - 1] == '&';
-        int out = 0, in = 0;
-        char *inFile, * outFile;
-        if(isInString(result, '<'))
-        {
-            in = 1;
-            inFile = strtok(strdup(result), ">");
-            inFile = strtok(NULL, "\0");
-            while(inFile[0] == ' ') inFile = &inFile[1];
-            argv = strtok(result, ">");
-        }
-        if(isInString(result, '>'))
-        {
-            out = 1;
-            outFile = strtok(strdup(result), ">");
-            outFile = strtok(NULL, "\0");
-            while(outFile[0] == ' ') outFile = &outFile[1];
-            argv = strtok(result, ">");
-        }
+    executeProgram(cmd, result, argv, background, out, outFile, in, inFile);
 
-        executeProgram(cmd, result, argv, background, out, outFile, in, inFile);
-    }
 }
 
 void foreground(char *fg)
@@ -229,8 +215,9 @@ void listFiles()
 {
     for (std::size_t i = 0; i < cwdFiles.size(); ++i)
     {
-        cout << cwdFiles[i] << endl;
+        cout << cwdFiles[i] << "\t";
     }
+    cout << endl;
 }
 
 void printCurrentDirectory()
@@ -295,7 +282,7 @@ void handle(char *result)
     {
         exit(0);
     }
-    else if (cmd[0] == '.' && cmd[1] == '/')
+    else if ((cmd[0] == '.' && cmd[1] == '/') || cmd[0] == '/')
     {
         char *argv = strtok(NULL, "\0");
         executeFile(cmd, argv, result);
@@ -325,7 +312,6 @@ void handle(char *result)
 
         char env_cmd[50] = "/bin/";
         strcat(env_cmd, cmd);
-        printf("Erro\n");
         executeProgram(env_cmd, result, argv, background, out, outFile, in, inFile);
     }
 }
@@ -336,9 +322,6 @@ void sigHandler(int sig)
 {
     printf("%d\n", sig);
 }
-/* Make sure the shell is running interactively as the foreground job
-   before proceeding. */
-
 
 pid_t shell_pgid;
 struct termios shell_tmodes;
@@ -353,7 +336,6 @@ init_shell ()
     signal(SIGINT, SIG_IGN);
     signal (SIGTSTP, SIG_IGN);
 
-    /* Linenoise functions */
 
     char prompt[2 * PATH_MAX];
 
