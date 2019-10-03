@@ -21,7 +21,7 @@
 using namespace std;
 
 
-int verifyDirectory(char *dir);
+int isInString(char *str, char value);
 void completionHook (char const *prefix, linenoiseCompletions *lc);
 void attCwdFiles();
 void attCwd();
@@ -29,6 +29,7 @@ void addJob(pid_t pid, char *result, int active, int stopped);
 void verifySetStopped(int status, pid_t pid);
 void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile);
 void executeFile(char *cmd, char *argv, char *result, int background);
+void background_(char *bg);
 void foreground(char *fg);
 void changeDirectory(char *path);
 void listFiles();

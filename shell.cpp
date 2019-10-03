@@ -19,7 +19,7 @@ vector<string> cwdFiles;
 vector<Job> jobs;
 pid_t last_executed = -1;
 
-int isInString(char *str, char value)
+int isInString(char *str, char value) // Função que verifica a presença de um caracter em uma string
 {
     for(int i = 0; i < strlen(str); i++)
     {
@@ -28,18 +28,7 @@ int isInString(char *str, char value)
     return 0;
 }
 
-
-int verifyDirectory(char *dir)
-{
-    struct stat aux;
-    if (stat(dir, &aux) && S_ISDIR(aux.st_mode))
-    {
-        return 0;
-    }
-    return 1;
-}
-
-void completionHook (char const *prefix, linenoiseCompletions *lc)
+void completionHook (char const *prefix, linenoiseCompletions *lc) // Auto-complete do linenoise
 {
     size_t i;
 
@@ -61,7 +50,7 @@ void completionHook (char const *prefix, linenoiseCompletions *lc)
     }
 }
 
-void attCwdFiles()
+void attCwdFiles() // Atualizar arquivos do diretório
 {
     DIR *d;
     struct dirent *dir;
@@ -76,7 +65,7 @@ void attCwdFiles()
     }
 }
 
-void attCwd()
+void attCwd() // Identificar diretório atual
 {
     if (getcwd(cwd, sizeof(cwd)) == NULL)
     {
@@ -85,7 +74,7 @@ void attCwd()
     }
 }
 
-void addJob(pid_t pid, char *result, int active, int stopped)
+void addJob(pid_t pid, char *result, int active, int stopped) // Adiciona um Job na lista de jobs
 {
     Job job;
     job.pid = pid;
@@ -95,10 +84,9 @@ void addJob(pid_t pid, char *result, int active, int stopped)
     if (jobs.size() == 0) job.id_job = 1;
     else job.id_job = jobs[jobs.size() - 1].id_job + 1;
     jobs.push_back(job);
-    printf("Inseriu %d\n", job.pid);
 }
 
-void verifySetStopped(int status, pid_t pid)
+void verifySetStopped(int status, pid_t pid) // Verifica se um job está parado e seta ele como parado caso positivo
 {
     if(WIFSTOPPED(status))
     {
@@ -111,13 +99,13 @@ void verifySetStopped(int status, pid_t pid)
     }
 }
 
-void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile)
+void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile) // Executa um programa
 {
     if( access( cmd, F_OK ) != -1 )
     {
         pid_t pid = fork();
         int status;
-        if (pid != 0 && !background)
+        if (pid != 0 && !background) // Se for o pai e não background
         {
             last_executed = pid;
             addJob(pid, result, 1, 0);
@@ -126,7 +114,7 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
             last_executed = -1;
             return;
         }
-        else if (pid != 0 && background)
+        else if (pid != 0 && background) // Se for o pai e background
         {
             addJob(pid, result, 1, 0);
             return;
@@ -137,7 +125,7 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
         }
         else
         {
-            if (in)
+            if (in) // Redirecionamento de output >
             {
                 int fd0 = open(inFile, O_RDONLY);
                 if(fd0 == NULL)
@@ -149,15 +137,15 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
                 close(fd0);
             }
 
-            if (out)
+            if (out) // Redirecionamento de input <
             {
                 int fd1 = creat(outFile, 0644) ;
                 dup2(fd1, STDOUT_FILENO);
                 close(fd1);
             }
 
-            char *args[] = { cmd, argv, NULL };
-            int exec_status = execv(cmd, args);
+            char *args[] = { cmd, argv, NULL }; // Argumentos para o programa
+            int exec_status = execv(cmd, args); // Executa o programa
             cerr << cmd << ": erro ao executar o programa." << endl;
 
         }
@@ -168,11 +156,11 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
     }
 }
 
-void executeFile(char *cmd, char *argv, char *result, int background)
+void executeFile(char *cmd, char *argv, char *result, int background) // Executa um arquivo chamado com / ou ./
 {
     int out = 0, in = 0;
     char *inFile, * outFile;
-    if(isInString(result, '<'))
+    if(isInString(result, '<')) // Verifica se é para redirecionar o input e identifica o arquivo para utilizar
     {
         in = 1;
         inFile = strtok(strdup(result), ">");
@@ -180,7 +168,7 @@ void executeFile(char *cmd, char *argv, char *result, int background)
         while(inFile[0] == ' ') inFile = &inFile[1];
         argv = strtok(result, ">");
     }
-    if(isInString(result, '>'))
+    if(isInString(result, '>')) // Verifica se é para redirecionar o output e identifica o arquivo para criar e gravar
     {
         out = 1;
         outFile = strtok(strdup(result), ">");
@@ -194,20 +182,22 @@ void executeFile(char *cmd, char *argv, char *result, int background)
 }
 
 
-void background(char *bg)
+void background_(char *bg) // Envia um processo para execução em background
 {
     if(bg[0] == '%')
     {
+       
         bg = &(bg[1]);
         int id_job;
         if(sscanf(bg, "%d", &id_job) > 0)
-        {
+        {   
             int i = 0;
 
-            while(jobs[i].id_job != id_job || i++ < jobs.size());
+            while(jobs[i].id_job != id_job && i++ < jobs.size());
 
             if(i != jobs.size())
             {
+                printf("Continuar\n");
                 kill(id_job, 18); //SIGCONT;
                 jobs[i].stopped = 0;
             }
@@ -228,7 +218,7 @@ void background(char *bg)
 }
 
 
-void foreground(char *fg)
+void foreground(char *fg) // Envia um processo para execução em foreground
 {
     if(fg[0] == '%')
     {
@@ -261,7 +251,7 @@ void foreground(char *fg)
     }
 }
 
-void changeDirectory(char *path)
+void changeDirectory(char *path) // cd
 {
     if (!chdir(path))
     {
@@ -272,7 +262,7 @@ void changeDirectory(char *path)
     else cout << "Diretório " << path << " não existe \n";
 }
 
-void listFiles()
+void listFiles() // ls
 {
     for (std::size_t i = 0; i < cwdFiles.size(); ++i)
     {
@@ -281,29 +271,28 @@ void listFiles()
     cout << endl;
 }
 
-void printCurrentDirectory()
+void printCurrentDirectory() // pwd
 {
     cout << cwd << endl;
 }
 
-void listJobs()
+void listJobs() // Listagem dos jobs
 {
     if(jobs.size() == 0) cout << "Não há tarefas no histórico" << endl;
     for (std::size_t i = 0; i < jobs.size(); ++i)
     {
-        if(kill(jobs[i].pid, 0) != 0)
-        {
+        int x = 0;
+        pid_t status = waitpid(jobs[i].pid, &x, WNOHANG);
+        if(status == jobs[i].pid || status == -1) {
             jobs[i].active = 0;
-            printf("Setou inativo: %d\n", jobs[i].pid);
         }
-        string stopped = jobs[i].stopped ? "[Stopped]" : "[Running]" ;
-        printf("Job ativo %d\n", jobs[i].pid);
-        if(jobs[i].active) cout << "Job " << /*stopped << jobs[i].id_job << " [" << */jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
+        string stopped = jobs[i].stopped ? "Stopped" : "Running" ;
+        if(jobs[i].active) cout << "Job " << jobs[i].id_job  << " [" << stopped << " at " << jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
     }
 }
 
 
-void handle(char *result)
+void handle(char *result) // Identificação e execução de comandos
 {
 
 
@@ -313,7 +302,7 @@ void handle(char *result)
     {
         strtok(result, "\n");
         strtok(result, "&");
-        if(result[strlen(result) -1] == ' ') result[strlen(result)-1] = '\0';
+        if(result[strlen(result) - 1] == ' ') result[strlen(result) - 1] = '\0';
     }
     else
     {
@@ -343,7 +332,7 @@ void handle(char *result)
     else if (!strcmp(cmd, "bg"))
     {
         char *bg = strtok(NULL, "\0");
-        foreground(bg);
+        background_(bg);
     }
     else if (!strcmp(cmd, "cd"))
     {
@@ -374,7 +363,7 @@ void handle(char *result)
         char *inFile, * outFile, * argv = restOfString;
         if(restOfString)
         {
-            if(isInString(restOfString, '<'))
+            if(isInString(restOfString, '<')) // Verifica se é para redirecionar o input e identifica o arquivo para utilizar
             {
                 in = 1;
                 inFile = strtok(strdup(restOfString), ">");
@@ -382,7 +371,7 @@ void handle(char *result)
                 while(inFile[0] == ' ') inFile = &inFile[1];
                 argv = strtok(restOfString, ">");
             }
-            if(isInString(restOfString, '>'))
+            if(isInString(restOfString, '>')) // Verifica se é para redirecionar o output e identifica o arquivo para criar e gravar
             {
                 out = 1;
                 outFile = strtok(strdup(restOfString), ">");
@@ -393,31 +382,51 @@ void handle(char *result)
         }
         char env_cmd[50] = "/bin/";
         strcat(env_cmd, cmd);
-        printf("Result final%s\n", result);
         executeProgram(env_cmd, result, argv, background, out, outFile, in, inFile);
     }
 }
 
 
 
-void sigHandler(int sig_num)
+void sigHandler(int sig_num) // Handler de sinais
 {
-    signal(SIGTSTP, sigHandler);
-    if(last_executed != -1)
-    {
-        printf("SIGSTP enviado para processo %d\n", last_executed);
+    signal(SIGINT, SIG_IGN);
+    signal (SIGTSTP, sigHandler);
+    signal(SIGCHLD, sigHandler);
 
-        int sent = kill(last_executed, 19);
-        last_executed = -1;
-    }
-    else
+    if(sig_num == SIGTSTP)
     {
-        cerr << "Nenhum processo para parar." << endl;
+        if(last_executed != -1)
+        {
+            printf("SIGSTP enviado para processo %d\n", last_executed);
+            int sent = kill(last_executed, 19);
+            last_executed = -1;
+        }
+        else
+        {
+            cerr << "Nenhum processo para parar." << endl;
+        }
+        fflush(stdout);
     }
-    fflush(stdout);
+    /*else if(sig_num == SIGCHLD)
+    {
+        pid_t pid;
+
+        pid = wait(NULL);
+        int it = 0;
+        while(it < jobs.size() && jobs[it].pid != pid) it++;
+        if(it != jobs.size())
+        {
+            jobs[it].active = 0;
+        }
+        fflush(stdout);
+    }*/
+    return;
+
 }
 
-void init_shell ()
+
+void init_shell () // Função principal
 {
     stop_shell = 0;
     cout << "Shell iniciado" << endl;
@@ -442,14 +451,13 @@ void init_shell ()
         strcat(prompt, cwd);
         strcat(prompt, "\x1b[0m$ ");
 
-        //char *result = linenoise(prompt);
-
+        //char *result = linenoise(prompt); // todo: implementar signals no linenoise
 
         cout << prompt;
 
         char *result = (char *) malloc(1024 * sizeof(char));
         size_t bufsize = 1024;
-        getline(&result, &bufsize, stdin);
+        getline(&result, &bufsize, stdin); // Leitura do comando
 
 
         if (result == NULL)
