@@ -1,7 +1,7 @@
 #include "jobs.h"
 #include "defines.h"
 #include "shell.cpp"
-#include "linenoise.h"
+#include "linenoise/linenoise.h"
 
 int main() {
 	init_shell();

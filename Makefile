@@ -1,4 +1,4 @@
-main: defines.cpp jobs.cpp ConvertUTF.cpp linenoise.cpp wcwidth.cpp main.cpp
-	g++ -o shell defines.cpp ConvertUTF.cpp linenoise.cpp wcwidth.cpp jobs.cpp main.cpp 
+main: defines.cpp jobs.cpp linenoise/*.cpp main.cpp
+	g++ -o shell defines.cpp jobs.cpp linenoise/*.cpp main.cpp 
 clean :
 	-rm shell
