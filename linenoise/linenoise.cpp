@@ -2645,15 +2645,41 @@ int InputBuffer::getInputLine(PromptBase& pi) {
       case ctrlChar('C'):  // ctrl-C, abort this line
         killRing.lastAction = KillRing::actionOther;
         historyRecallMostRecent = false;
-        errno = EAGAIN;
-        --historyLen;
-        free(history[historyLen]);
-        // we need one last refresh with the cursor at the end of the line
-        // so we don't display the next prompt over the previous input line
-        pos = len;  // pass len as pos for EOL
-        refreshLine(pi);
-        if (write(1, "^C", 2) == -1) return -1;  // Display the ^C we got
-        return -1;
+        if (len < buflen) {
+          if (isControlChar(c)) {  // don't insert control characters
+            beep();
+            break;
+          }
+          if (len == pos) {  // at end of buffer
+            buf32[pos] = c;
+            ++pos;
+            ++len;
+            buf32[len] = '\0';
+            int inputLen = calculateColumnPosition(buf32, len);
+            if (pi.promptIndentation + inputLen < pi.promptScreenColumns) {
+              if (inputLen > pi.promptPreviousInputLen)
+                pi.promptPreviousInputLen = inputLen;
+              /* Avoid a full update of the line in the
+               * trivial case. */
+              if (write32(1, reinterpret_cast<char32_t*>(&c), 1) == -1)
+                return -1;
+            } else {
+              refreshLine(pi);
+            }
+          } else {  // not at end of buffer, have to move characters to our
+                    // right
+            memmove(buf32 + pos + 1, buf32 + pos,
+                    sizeof(char32_t) * (len - pos));
+            buf32[pos] = c;
+            ++len;
+            ++pos;
+            buf32[len] = '\0';
+            refreshLine(pi);
+          }
+        } else {
+          beep();  // buffer is full, beep on new characters
+        }
+        break;
 
       case META + 'c':  // meta-C, give word initial Cap
       case META + 'C':

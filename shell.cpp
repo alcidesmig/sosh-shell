@@ -316,23 +316,10 @@ void handle(char *result)
     }
 }
 
-
-
-void sigHandler(int sig_num) 
-{ 
-    signal(SIGINT, sigHandler); 
-    printf("\n CTRL+C\n"); 
-    fflush(stdout); 
-} 
-
 void init_shell ()
 {
     stop_shell = 0;
     cout << "Shell iniciado" << endl;
-
-    signal(SIGINT, sigHandler); 
-    signal (SIGTSTP, SIG_IGN);
-
 
     char prompt[2 * PATH_MAX];
 
