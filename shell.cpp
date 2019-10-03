@@ -87,57 +87,62 @@ void attCwd()
 
 void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile)
 {
-    pid_t pid = fork();
-    int status;
-    if (pid != 0 && !background)
+    if( access( cmd, F_OK ) != -1 )
     {
-        printf("Esperando\n");
-        waitpid(pid, &status, 0); /* Wait for process in foreground */
-        printf("Finalizado\n");
-        return;
-    }
-    else if (pid != 0 && background)
-    {
-        Job job; /* Process in background */
-        job.pid = pid;
-        job.cmd = result;
-        job.active = 1;
-        if (jobs.size() == 0) job.id_job = 1;
-        else job.id_job = jobs[jobs.size() - 1].id_job + 1;
-        jobs.push_back(job);
-        return;
-    }
-    else if (pid < 0)
-    {
-        cerr << "Erro ao executar o programa" << endl;
+        pid_t pid = fork();
+        int status;
+        if (pid != 0 && !background)
+        {
+            printf("Esperando\n");
+            waitpid(pid, &status, 0); /* Wait for process in foreground */
+            printf("Finalizado\n");
+            return;
+        }
+        else if (pid != 0 && background)
+        {
+            Job job; /* Process in background */
+            job.pid = pid;
+            job.cmd = result;
+            job.active = 1;
+            if (jobs.size() == 0) job.id_job = 1;
+            else job.id_job = jobs[jobs.size() - 1].id_job + 1;
+            jobs.push_back(job);
+            return;
+        }
+        else if (pid < 0)
+        {
+            cerr << "Erro ao fazer o fork do programa" << endl;
+        }
+        else
+        {
+            if (in)
+            {
+                int fd0 = open(inFile, O_RDONLY);
+                if(fd0 == NULL)
+                {
+                    cerr << inFile << ": arquivo não encontrado" << endl;
+                    return;
+                }
+                dup2(fd0, STDIN_FILENO);
+                close(fd0);
+            }
+
+            if (out)
+            {
+                int fd1 = creat(outFile, 0644) ;
+                dup2(fd1, STDOUT_FILENO);
+                close(fd1);
+            }
+
+            char *args[] = { cmd, argv, NULL };
+            int exec_status = execv(cmd, args);
+            cerr << cmd << ": erro ao executar o programa." << endl;
+
+        }
     }
     else
     {
-        if (in)
-        {
-            int fd0 = open(inFile, O_RDONLY);
-            if(fd0 == NULL)
-            {
-                cerr << inFile << ": arquivo não encontrado" << endl;
-                return;
-            }
-            dup2(fd0, STDIN_FILENO);
-            close(fd0);
-        }
-
-        if (out)
-        {
-            int fd1 = creat(outFile, 0644) ;
-            dup2(fd1, STDOUT_FILENO);
-            close(fd1);
-        }
-
-        char *args[] = { cmd, argv, NULL };
-        int exec_status = execv(cmd, args);
-        if(exec_status)
-        {
-            cerr << cmd << ": comando não encontrado" << endl;
-        }
+        cerr << cmd << ": programa não encontrado." << endl;
     }
 }
 
@@ -292,24 +297,25 @@ void handle(char *result)
         char *restOfString = strtok(NULL, "\0");
         int out = 0, in = 0;
         char *inFile, * outFile, * argv = restOfString;
-        printf("IsIN: %d\n", isInString(restOfString, '>'));
-        if(isInString(restOfString, '<'))
+        if(restOfString)
         {
-            in = 1;
-            inFile = strtok(strdup(restOfString), ">");
-            inFile = strtok(NULL, "\0");
-            while(inFile[0] == ' ') inFile = &inFile[1];
-            argv = strtok(restOfString, ">");
+            if(isInString(restOfString, '<'))
+            {
+                in = 1;
+                inFile = strtok(strdup(restOfString), ">");
+                inFile = strtok(NULL, "\0");
+                while(inFile[0] == ' ') inFile = &inFile[1];
+                argv = strtok(restOfString, ">");
+            }
+            if(isInString(restOfString, '>'))
+            {
+                out = 1;
+                outFile = strtok(strdup(restOfString), ">");
+                outFile = strtok(NULL, "\0");
+                while(outFile[0] == ' ') outFile = &outFile[1];
+                argv = strtok(restOfString, ">");
+            }
         }
-        if(isInString(restOfString, '>'))
-        {
-            out = 1;
-            outFile = strtok(strdup(restOfString), ">");
-            outFile = strtok(NULL, "\0");
-            while(outFile[0] == ' ') outFile = &outFile[1];
-            argv = strtok(restOfString, ">");
-        }
-
         char env_cmd[50] = "/bin/";
         strcat(env_cmd, cmd);
         executeProgram(env_cmd, result, argv, background, out, outFile, in, inFile);
@@ -318,19 +324,19 @@ void handle(char *result)
 
 
 
-void sigHandler(int sig_num) 
-{ 
-    signal(SIGINT, sigHandler); 
-    printf("\n CTRL+C\n"); 
-    fflush(stdout); 
-} 
+void sigHandler(int sig_num)
+{
+    signal(SIGINT, sigHandler);
+    printf("\n CTRL+C\n");
+    fflush(stdout);
+}
 
 void init_shell ()
 {
     stop_shell = 0;
     cout << "Shell iniciado" << endl;
 
-    signal(SIGINT, sigHandler); 
+    signal(SIGINT, SIG_IGN);
     signal (SIGTSTP, SIG_IGN);
 
 
@@ -350,7 +356,11 @@ void init_shell ()
         strcat(prompt, cwd);
         strcat(prompt, "\x1b[0m$ ");
 
-        char *result = linenoise(prompt);
+        //char *result = linenoise(prompt);
+
+        char *result = (char *) malloc(1024 * sizeof(char));
+        cout << prompt;
+        cin >> result;
 
         if (result == NULL)
         {
