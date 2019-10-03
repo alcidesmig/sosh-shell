@@ -318,22 +318,19 @@ void handle(char *result)
 
 
 
-void sigHandler(int sig)
-{
-    printf("%d\n", sig);
-}
+void sigHandler(int sig_num) 
+{ 
+    signal(SIGINT, sigintHandler); 
+    printf("\n CTRL+C\n"); 
+    fflush(stdout); 
+} 
 
-pid_t shell_pgid;
-struct termios shell_tmodes;
-int shell_terminal;
-int shell_is_interactive;
-void
-init_shell ()
+void init_shell ()
 {
     stop_shell = 0;
     cout << "Shell iniciado" << endl;
 
-    signal(SIGINT, SIG_IGN);
+    signal(SIGINT, sigHandler); 
     signal (SIGTSTP, SIG_IGN);
 
 
