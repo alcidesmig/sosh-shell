@@ -15,6 +15,7 @@
 #include <iostream>
 #include <sys/stat.h>
 #include <errno.h>
+#include <fcntl.h>
 #include "linenoise.h"
 using namespace std;
 
@@ -23,7 +24,7 @@ int verifyDirectory(char *dir);
 void completionHook (char const *prefix, linenoiseCompletions *lc);
 void attCwdFiles();
 void attCwd();
-void executeProgram(char *cmd, char *result, char *argv, int background);
+void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile);
 void executeFile(char *cmd, char *argv);
 void foreground(char *fg);
 void changeDirectory(char *path);

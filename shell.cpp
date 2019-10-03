@@ -74,7 +74,7 @@ void attCwd()
     }
 }
 
-void executeProgram(char *cmd, char *result, char *argv, int background)
+void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile)
 {
     pid_t pid = fork();
     int status;
@@ -101,11 +101,26 @@ void executeProgram(char *cmd, char *result, char *argv, int background)
     }
     else
     {
-        char env_cmd[6] = "/bin/";
+        if (in)
+        {
+            int fd0 = open(inFile, O_RDONLY);
+            if(fd0 == NULL) {
+                cerr << inFile << ": arquivo não encontrado" << endl;
+                return;
+            }
+            dup2(fd0, STDIN_FILENO);
+            close(fd0);
+        }
 
-        strcat(env_cmd, cmd);
+        if (out)
+        {
+            int fd1 = creat(outFile, 0644) ;
+            dup2(fd1, STDOUT_FILENO);
+            close(fd1);
+        }
 
-        int exec_status = execv(env_cmd, &argv);
+        char * args[] = { cmd, argv, NULL };
+        int exec_status = execv(cmd, args);
 
         if(exec_status)
         {
@@ -129,7 +144,8 @@ void executeFile(char *cmd, char *argv)
     }
     else
     {
-        execv(cmd, &argv);
+        char * args[] = { cmd, argv, NULL };
+        execv(cmd, args);
     }
 }
 
@@ -204,6 +220,16 @@ void listJobs()
     }
 }
 
+int isInString(char *str, char value)
+{
+    for(int i = 0; i < strlen(str); i++)
+    {
+        if(str[i] == value) return 1;
+    }
+    return 0;
+}
+
+
 void handle(char *result)
 {
     char *cmd = strtok(strdup(result), " ");
@@ -227,7 +253,7 @@ void handle(char *result)
     }
     else if (!strcmp(cmd, "bg"))
     {
-
+        // to do
     }
     else if (!strcmp(cmd, "cd"))
     {
@@ -253,9 +279,31 @@ void handle(char *result)
     }
     else
     {
-        char *argv = strtok(NULL, "\0");
-        executeProgram(cmd, result, argv, background);
+        char *restOfString = strtok(NULL, "\0");
+        int out = 0, in = 0;
+        char *inFile, * outFile, * argv = restOfString;
+        printf("IsIN: %d\n", isInString(restOfString, '>'));
+        if(isInString(restOfString, '<'))
+        {
+            in = 1;
+            inFile = strtok(strdup(restOfString), ">");
+            inFile = strtok(NULL, "\0");
+            while(inFile[0] == ' ') inFile = &inFile[1];
+            argv = strtok(restOfString, ">");
+        }
+        if(isInString(restOfString, '>'))
+        {
+            out = 1;
+            outFile = strtok(strdup(restOfString), ">");
+            outFile = strtok(NULL, "\0");
+            while(outFile[0] == ' ') outFile = &outFile[1];
+            argv = strtok(restOfString, ">");
+        }
 
+        char env_cmd[6] = "/bin/";
+        strcat(env_cmd, cmd);
+
+        executeProgram(env_cmd, result, argv, background, out, outFile, in, inFile);
     }
 }
 
