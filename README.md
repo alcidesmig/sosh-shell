@@ -2,10 +2,9 @@
 Implementação de um shell com os comandos básicos para a disciplina de Sistemas Operacionais 2019.2
 
 ## Como usar
-> make
-> ./shell
+> make && ./shell
 
 
 ### Equipe
-> Alcides Mignoso e Silva
-> Matheus Victorello
+- Alcides Mignoso e Silva
+- Matheus Victorello
