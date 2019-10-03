@@ -132,9 +132,9 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
             close(fd1);
         }
 
-        char *args[] = { cmd, argv, NULL };
+        char *args[] = { cmd, argv, NULL }; printf("Erro2\n");
         int exec_status = execv(cmd, args);
-
+ printf("Erro2\n");
         if(exec_status)
         {
             cerr << cmd << ": comando não encontrado" << endl;
@@ -157,7 +157,6 @@ void executeFile(char *cmd, char *argv, char *result)
     }
     else
     {
-        printf("%s result\n%s cmd\n%s argv", result, cmd, argv);
         int background = result[strlen(result) - 1] == '&';
         int out = 0, in = 0;
         char *inFile, * outFile;
@@ -324,9 +323,9 @@ void handle(char *result)
             argv = strtok(restOfString, ">");
         }
 
-        char env_cmd[6] = "/bin/";
+        char env_cmd[50] = "/bin/";
         strcat(env_cmd, cmd);
-
+        printf("Erro\n");
         executeProgram(env_cmd, result, argv, background, out, outFile, in, inFile);
     }
 }
