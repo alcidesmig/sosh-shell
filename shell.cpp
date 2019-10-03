@@ -17,7 +17,7 @@ int stop_shell;
 char cwd[PATH_MAX];
 vector<string> cwdFiles;
 vector<Job> jobs;
-
+pid_t last_executed = -1;
 
 int isInString(char *str, char value)
 {
@@ -85,6 +85,32 @@ void attCwd()
     }
 }
 
+void addJob(pid_t pid, char *result, int active, int stopped)
+{
+    Job job;
+    job.pid = pid;
+    job.cmd = result;
+    job.active = active;
+    job.stopped = stopped;
+    if (jobs.size() == 0) job.id_job = 1;
+    else job.id_job = jobs[jobs.size() - 1].id_job + 1;
+    jobs.push_back(job);
+    printf("Inseriu %d\n", job.pid);
+}
+
+void verifySetStopped(int status, pid_t pid)
+{
+    if(WIFSTOPPED(status))
+    {
+        int it = 0;
+        while(it < jobs.size() && jobs[it].pid != pid) it++;
+        if(it != jobs.size())
+        {
+            jobs[it].stopped = 1;
+        }
+    }
+}
+
 void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile)
 {
     if( access( cmd, F_OK ) != -1 )
@@ -93,20 +119,16 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
         int status;
         if (pid != 0 && !background)
         {
-            printf("Esperando\n");
-            waitpid(pid, &status, 0); /* Wait for process in foreground */
-            printf("Finalizado\n");
+            last_executed = pid;
+            addJob(pid, result, 1, 0);
+            waitpid(pid, &status, WUNTRACED); /* Wait for process in foreground */
+            verifySetStopped(status, pid);
+            last_executed = -1;
             return;
         }
         else if (pid != 0 && background)
         {
-            Job job; /* Process in background */
-            job.pid = pid;
-            job.cmd = result;
-            job.active = 1;
-            if (jobs.size() == 0) job.id_job = 1;
-            else job.id_job = jobs[jobs.size() - 1].id_job + 1;
-            jobs.push_back(job);
+            addJob(pid, result, 1, 0);
             return;
         }
         else if (pid < 0)
@@ -146,9 +168,8 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
     }
 }
 
-void executeFile(char *cmd, char *argv, char *result)
+void executeFile(char *cmd, char *argv, char *result, int background)
 {
-    int background = result[strlen(result) - 1] == '&';
     int out = 0, in = 0;
     char *inFile, * outFile;
     if(isInString(result, '<'))
@@ -171,6 +192,41 @@ void executeFile(char *cmd, char *argv, char *result)
     executeProgram(cmd, result, argv, background, out, outFile, in, inFile);
 
 }
+
+
+void background(char *bg)
+{
+    if(bg[0] == '%')
+    {
+        bg = &(bg[1]);
+        int id_job;
+        if(sscanf(bg, "%d", &id_job) > 0)
+        {
+            int i = 0;
+
+            while(jobs[i].id_job != id_job || i++ < jobs.size());
+
+            if(i != jobs.size())
+            {
+                kill(id_job, 18); //SIGCONT;
+                jobs[i].stopped = 0;
+            }
+            else
+            {
+                cerr << "Job não encontrado." << endl;
+            }
+        }
+        else
+        {
+            cerr << "Utilize bg %id_job." << endl;
+        }
+    }
+    else
+    {
+        cerr << "Utilize bg %id_job." << endl;
+    }
+}
+
 
 void foreground(char *fg)
 {
@@ -235,25 +291,43 @@ void listJobs()
     if(jobs.size() == 0) cout << "Não há tarefas no histórico" << endl;
     for (std::size_t i = 0; i < jobs.size(); ++i)
     {
-        kill(jobs[i].pid, 0);
-        if(errno = ESRCH)
+        if(kill(jobs[i].pid, 0) != 0)
         {
             jobs[i].active = 0;
+            printf("Setou inativo: %d\n", jobs[i].pid);
         }
-        if(jobs[i].active) cout << "Job " << jobs[i].id_job << " [" << jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
+        string stopped = jobs[i].stopped ? "[Stopped]" : "[Running]" ;
+        printf("Job ativo %d\n", jobs[i].pid);
+        if(jobs[i].active) cout << "Job " << /*stopped << jobs[i].id_job << " [" << */jobs[i].pid << "]" << ": " << jobs[i].cmd << endl;
     }
 }
 
 
 void handle(char *result)
 {
-    char *cmd = strtok(strdup(result), " ");
 
-    int background = result[strlen(result) - 1] == '&';
+
+    int background = result[strlen(result) - 2] == '&';
 
     if(background)
     {
-        result[strlen(result) - 1] = '\0';
+        strtok(result, "\n");
+        strtok(result, "&");
+        if(result[strlen(result) -1] == ' ') result[strlen(result)-1] = '\0';
+    }
+    else
+    {
+        strtok(result, "\n");
+    }
+
+    char *cmd;
+    if(isInString(result, ' '))
+    {
+        cmd = strtok(strdup(result), " ");
+    }
+    else
+    {
+        cmd = strtok(strdup(result), "\n");
     }
 
     if (!strcmp(cmd, "jobs"))
@@ -268,7 +342,8 @@ void handle(char *result)
     }
     else if (!strcmp(cmd, "bg"))
     {
-        // to do
+        char *bg = strtok(NULL, "\0");
+        foreground(bg);
     }
     else if (!strcmp(cmd, "cd"))
     {
@@ -290,7 +365,7 @@ void handle(char *result)
     else if ((cmd[0] == '.' && cmd[1] == '/') || cmd[0] == '/')
     {
         char *argv = strtok(NULL, "\0");
-        executeFile(cmd, argv, result);
+        executeFile(cmd, argv, result, background);
     }
     else
     {
@@ -318,6 +393,7 @@ void handle(char *result)
         }
         char env_cmd[50] = "/bin/";
         strcat(env_cmd, cmd);
+        printf("Result final%s\n", result);
         executeProgram(env_cmd, result, argv, background, out, outFile, in, inFile);
     }
 }
@@ -326,8 +402,18 @@ void handle(char *result)
 
 void sigHandler(int sig_num)
 {
-    signal(SIGINT, sigHandler);
-    printf("\n CTRL+C\n");
+    signal(SIGTSTP, sigHandler);
+    if(last_executed != -1)
+    {
+        printf("SIGSTP enviado para processo %d\n", last_executed);
+
+        int sent = kill(last_executed, 19);
+        last_executed = -1;
+    }
+    else
+    {
+        cerr << "Nenhum processo para parar." << endl;
+    }
     fflush(stdout);
 }
 
@@ -337,7 +423,7 @@ void init_shell ()
     cout << "Shell iniciado" << endl;
 
     signal(SIGINT, SIG_IGN);
-    signal (SIGTSTP, SIG_IGN);
+    signal (SIGTSTP, sigHandler);
 
 
     char prompt[2 * PATH_MAX];
@@ -358,9 +444,13 @@ void init_shell ()
 
         //char *result = linenoise(prompt);
 
-        char *result = (char *) malloc(1024 * sizeof(char));
+
         cout << prompt;
-        cin >> result;
+
+        char *result = (char *) malloc(1024 * sizeof(char));
+        size_t bufsize = 1024;
+        getline(&result, &bufsize, stdin);
+
 
         if (result == NULL)
         {
