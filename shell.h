@@ -26,7 +26,7 @@ void completionHook (char const *prefix, linenoiseCompletions *lc);
 void attCwdFiles();
 void attCwd();
 void executeProgram(char *cmd, char *result, char *argv, int background, int out, char *outFile, int in, char *inFile);
-void executeFile(char *cmd, char *argv);
+void executeFile(char *cmd, char *argv, char *result);
 void foreground(char *fg);
 void changeDirectory(char *path);
 void listFiles();

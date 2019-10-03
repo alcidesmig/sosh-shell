@@ -18,6 +18,17 @@ char cwd[PATH_MAX];
 vector<string> cwdFiles;
 vector<Job> jobs;
 
+
+int isInString(char *str, char value)
+{
+    for(int i = 0; i < strlen(str); i++)
+    {
+        if(str[i] == value) return 1;
+    }
+    return 0;
+}
+
+
 int verifyDirectory(char *dir)
 {
     struct stat aux;
@@ -83,6 +94,7 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
         printf("Esperando\n");
         waitpid(pid, &status, 0); /* Wait for process in foreground */
         printf("Finalizado\n");
+        return;
     }
     else if (pid != 0 && background)
     {
@@ -104,7 +116,8 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
         if (in)
         {
             int fd0 = open(inFile, O_RDONLY);
-            if(fd0 == NULL) {
+            if(fd0 == NULL)
+            {
                 cerr << inFile << ": arquivo não encontrado" << endl;
                 return;
             }
@@ -119,7 +132,7 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
             close(fd1);
         }
 
-        char * args[] = { cmd, argv, NULL };
+        char *args[] = { cmd, argv, NULL };
         int exec_status = execv(cmd, args);
 
         if(exec_status)
@@ -129,7 +142,7 @@ void executeProgram(char *cmd, char *result, char *argv, int background, int out
     }
 }
 
-void executeFile(char *cmd, char *argv)
+void executeFile(char *cmd, char *argv, char *result)
 {
     int pid = fork();
     int status;
@@ -144,8 +157,28 @@ void executeFile(char *cmd, char *argv)
     }
     else
     {
-        char * args[] = { cmd, argv, NULL };
-        execv(cmd, args);
+        printf("%s result\n%s cmd\n%s argv", result, cmd, argv);
+        int background = result[strlen(result) - 1] == '&';
+        int out = 0, in = 0;
+        char *inFile, * outFile;
+        if(isInString(result, '<'))
+        {
+            in = 1;
+            inFile = strtok(strdup(result), ">");
+            inFile = strtok(NULL, "\0");
+            while(inFile[0] == ' ') inFile = &inFile[1];
+            argv = strtok(result, ">");
+        }
+        if(isInString(result, '>'))
+        {
+            out = 1;
+            outFile = strtok(strdup(result), ">");
+            outFile = strtok(NULL, "\0");
+            while(outFile[0] == ' ') outFile = &outFile[1];
+            argv = strtok(result, ">");
+        }
+
+        executeProgram(cmd, result, argv, background, out, outFile, in, inFile);
     }
 }
 
@@ -220,15 +253,6 @@ void listJobs()
     }
 }
 
-int isInString(char *str, char value)
-{
-    for(int i = 0; i < strlen(str); i++)
-    {
-        if(str[i] == value) return 1;
-    }
-    return 0;
-}
-
 
 void handle(char *result)
 {
@@ -275,7 +299,7 @@ void handle(char *result)
     else if (cmd[0] == '.' && cmd[1] == '/')
     {
         char *argv = strtok(NULL, "\0");
-        executeFile(cmd, argv);
+        executeFile(cmd, argv, result);
     }
     else
     {
@@ -327,41 +351,8 @@ init_shell ()
     stop_shell = 0;
     cout << "Shell iniciado" << endl;
 
-    /* See if we are running interactively.  */
-    shell_terminal = STDIN_FILENO;
-    shell_is_interactive = isatty (shell_terminal);
-
-    if (shell_is_interactive)
-    {
-        /* Loop until we are in the foreground.  */
-        while (tcgetpgrp (shell_terminal) != (shell_pgid = getpgrp ()))
-            kill (- shell_pgid, SIGTTIN);
-
-        /* Ignore interactive and job-control signals.  */
-        signal (SIGINT, sigHandler);
-        signal (SIGQUIT, sigHandler);
-        signal (SIGTSTP, sigHandler);
-        signal (SIGTTIN, sigHandler);
-        signal (SIGTTOU, sigHandler);
-        signal (SIGCHLD, sigHandler);
-
-        /* Put ourselves in our own process group.  */
-        shell_pgid = getpid ();
-        if (setpgid (shell_pgid, shell_pgid) < 0)
-        {
-            perror ("Couldn't put the shell in its own process group");
-            exit (1);
-        }
-
-        /* Grab control of the terminal.  */
-        tcsetpgrp (shell_terminal, shell_pgid);
-
-        /* Save default terminal attributes for shell.  */
-        tcgetattr (shell_terminal, &shell_tmodes);
-    }
-
-
-
+    signal(SIGINT, SIG_IGN);
+    signal (SIGTSTP, SIG_IGN);
 
     /* Linenoise functions */
 
