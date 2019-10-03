@@ -320,7 +320,7 @@ void handle(char *result)
 
 void sigHandler(int sig_num) 
 { 
-    signal(SIGINT, sigintHandler); 
+    signal(SIGINT, sigHandler); 
     printf("\n CTRL+C\n"); 
     fflush(stdout); 
 } 
