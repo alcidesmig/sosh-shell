@@ -28,28 +28,6 @@ int isInString(char *str, char value) // Função que verifica a presença de um
     return 0;
 }
 
-void completionHook (char const *prefix, linenoiseCompletions *lc) // Auto-complete do linenoise
-{
-    size_t i;
-
-    for (i = 0;  commands[i] != NULL; ++i)
-    {
-        if (strncmp(prefix, commands[i], strlen(prefix)) == 0)
-        {
-            linenoiseAddCompletion(lc, commands[i]);
-        }
-    }
-
-    for (std::size_t i = 0; i < cwdFiles.size(); ++i)
-    {
-        const char *c_str = cwdFiles[i].c_str();
-        if (strncmp(prefix, c_str, strlen(prefix)) == 0)
-        {
-            linenoiseAddCompletion(lc, c_str);
-        }
-    }
-}
-
 void attCwdFiles() // Atualizar arquivos do diretório
 {
     DIR *d;
@@ -440,9 +418,6 @@ void init_shell () // Função principal
     attCwd();
     attCwdFiles();
 
-    linenoiseInstallWindowChangeHandler();
-    linenoiseHistoryLoad(HISTORY);
-    linenoiseSetCompletionCallback(completionHook);
 
     while (!stop_shell)
     {
@@ -450,8 +425,6 @@ void init_shell () // Função principal
         strcat(prompt, "\x1b[1;32mshell\x1b[0m:\x1b[1;34m");
         strcat(prompt, cwd);
         strcat(prompt, "\x1b[0m$ ");
-
-        //char *result = linenoise(prompt); // todo: implementar signals no linenoise
 
         cout << prompt;
 
@@ -475,11 +448,8 @@ void init_shell () // Função principal
             break;
         }
 
-        linenoiseHistoryAdd(result);
         free(result);
     }
 
-    linenoiseHistorySave(HISTORY);
-    linenoiseHistoryFree();
     return;
 }
