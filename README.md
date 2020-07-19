@@ -1,5 +1,5 @@
 # sosh-shell
-- Shell implementation for Linux with basic commands for the discipline Operating Systems 2019.2
+- Shell implementation for Linux with basic commands for the Operating Systems (2019.2) discipline 
 - (pt-BR) Implementação de um shell com os comandos básicos para a disciplina de Sistemas Operacionais 2019.2
 
 ## How to use ~ Como usar
