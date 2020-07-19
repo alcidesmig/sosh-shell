@@ -1,12 +1,13 @@
 # sosh-shell
-Implementação de um shell com os comandos básicos para a disciplina de Sistemas Operacionais 2019.2
+EN: Shell implementation for Linux with basic commands for the discipline Operating Systems 2019.2
+PT: Implementação de um shell com os comandos básicos para a disciplina de Sistemas Operacionais 2019.2
 
-## Como usar
+## How to use ~ Como usar
 > make && ./shell
 
 ## To do
-- Melhorar a modularização do código
-- Implementar os sinais no linenoise para utilização do mesmo
+- Modularize code
+- Implement signal handler in Linenoise
 
 ### Equipe
 - Alcides Mignoso e Silva
